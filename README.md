@@ -107,9 +107,10 @@ KiteAsyncImage(
 
 Coil itself can't animate outside Android (its non-Android decode is a Skia
 delegate, and coil-gif is an Android-only module). `KiteImageDecoder` claims only
-what KiteImage fully decodes — GIF and the supported PNG/BMP subsets — and declines
-the rest (JPEG, SVG, interlaced PNG, …) so Coil's platform decoders keep them and
-nothing regresses. Animated results skip Coil's memory cache (`shareable = false`,
+what KiteImage fully decodes — GIF, baseline JPEG and the supported PNG/BMP
+subsets — and declines the rest (progressive JPEG, SVG, interlaced PNG, …) so
+Coil's platform decoders keep them and nothing regresses. Animated results skip
+Coil's memory cache (`shareable = false`,
 same tradeoff as coil-gif) and re-decode from disk cache; plain `AsyncImage` still
 shows their first frame, `KiteAsyncImage` plays them.
 
