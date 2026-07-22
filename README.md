@@ -1,7 +1,7 @@
 # KiteImage
 
 [![Kotlin Multiplatform](https://img.shields.io/badge/Kotlin-Multiplatform-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org/docs/multiplatform.html)
-[![Targets](https://img.shields.io/badge/targets-Android%20|%20iOS%20|%20JVM%20|%20JS%20|%20WASM-success)](#install)
+[![Targets](https://img.shields.io/badge/targets-Android%20|%20iOS%20|%20macOS%20|%20JVM%20|%20JS%20|%20WASM-success)](#install)
 [![Core deps](https://img.shields.io/badge/core%20dependencies-kotlin--stdlib%20only-blue)](#why-kiteimage)
 [![Ported from](https://img.shields.io/badge/ports-stb__image%20·%20commons--imaging-orange)](reference/REFERENCES.md)
 [![License](https://img.shields.io/badge/license-Apache--2.0-lightgrey)](#license--credits)
@@ -67,8 +67,25 @@ Today, at v0.0.1:
 
 The full matrix with per-feature detail lives in [PORTING_STATUS.md](PORTING_STATUS.md).
 
-A `kiteimage-compose` module (ImageBitmap interop + animated playback) is planned next
-to the core.
+## Compose
+
+`kiteimage-compose` ships one composable. It decides on its own whether to animate —
+feed it anything:
+
+```kotlin
+KiteImage(
+    data = bytes,                  // GIF → plays; PNG/BMP → draws. No branching.
+    contentDescription = "avatar",
+    modifier = Modifier.size(96.dp),
+    // animate = false,            // escape hatch: pin the first frame (thumbnails)
+    // onError = { log(it) },      // malformed input → draws nothing + callback
+)
+```
+
+Decoding runs off the UI thread. Animated inputs honor per-frame delays (with the
+browser ≤10 ms → 100 ms rule), disposal compositing, and the NETSCAPE loop count —
+finite loops end holding the last frame. `KiteBitmap.toImageBitmap()` is public for
+custom pipelines, and an overload takes an already-decoded `KiteBitmap`.
 
 ## Install
 

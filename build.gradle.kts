@@ -13,6 +13,7 @@ allprojects {
 
 dependencies {
     dokka(project(":kiteimage"))
+    dokka(project(":kiteimage-compose"))
 }
 
 dokka {

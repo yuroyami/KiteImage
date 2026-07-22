@@ -1,8 +1,10 @@
 # KiteImage — porting status
 
-Updated 2026-07-22 (GIF landed same day). Tests: 50 on JVM (incl. two ImageIO
-round-trip suites), 41 on JS/Node (the common set), all green. Targets compiling:
-Android, iosArm64, iosSimulatorArm64, iosX64, JVM, JS (browser+node), wasmJs.
+Updated 2026-07-22 (GIF + the Compose module landed same day). Tests: core 50 on
+JVM (incl. two ImageIO round-trip suites) + 41 on JS/Node (the common set), compose
+2 on JVM (headless Skiko rasterization) — all green. Core targets: Android,
+iosArm64, iosSimulatorArm64, iosX64, macosArm64, JVM, JS (browser+node), wasmJs.
+Compose targets: the CMP 1.11 set (no Intel-Apple variants).
 
 ## Decoders
 
@@ -45,7 +47,9 @@ lands there) → JPEG baseline (stb_image_write/jpge) → GIF (commons-imaging w
 | bomb guards (16M px/side, 268M px total, exact-size IDAT inflate cap) | ✅ |
 | commonTest vectors (python3-zlib generated, filters/depths/tRNS pinned) | ✅ 28 |
 | jvmTest ImageIO round-trip (organic adaptive-filter data) | ✅ 6 |
-| `:kiteimage-compose` (ImageBitmap interop, animated playback) | ❌ planned with GIF |
+| `:kiteimage-compose`: `KiteImage()` composable — auto-detects animated vs static, off-UI-thread decode, delays/loop-count playback, `animate` escape hatch, `onError` | ✅ |
+| `KiteBitmap.toImageBitmap()` — Android `createBitmap` / shared Skiko UNPREMUL raster (custom `skikoMain` source set) | ✅ pixel-tested on JVM (opaque exact, semi-alpha ±1, alpha-0 keeps alpha only) |
+| Compose module targets (CMP 1.11 set: android, jvm, iosArm64+sim, macosArm64, js, wasmJs) | ✅ compiling |
 
 ## Excluded, with reasons
 

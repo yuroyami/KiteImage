@@ -39,6 +39,10 @@ kotlin {
         }
     }
 
+    // Apple-Silicon macOS (Intel is deprecated in Kotlin 2.3+) — pure computation,
+    // and :kiteimage-compose needs the core published for every CMP target.
+    macosArm64()
+
     @OptIn(ExperimentalKotlinGradlePluginApi::class)
     js(IR) {
         browser()

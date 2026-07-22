@@ -22,6 +22,11 @@ plugins {
 rootProject.name = "KiteImage-KMP"
 
 // :kiteimage — the pure-Kotlin image codec core (stdlib only). Format sniffing,
-// decoders (BMP, PNG, …), the ARGB pixel-buffer type, and the malformed-input
-// guards all live here and port cleanly to every KMP target.
+// decoders (BMP, PNG, GIF, …), the ARGB pixel-buffer type, and the
+// malformed-input guards all live here and port cleanly to every KMP target.
 include(":kiteimage")
+
+// :kiteimage-compose — the optional Compose Multiplatform binding: the
+// KiteImage() composable (auto-detects animated vs static input) and the
+// KiteBitmap → ImageBitmap conversion. Keeps Compose off core consumers.
+include(":kiteimage-compose")
