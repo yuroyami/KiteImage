@@ -23,12 +23,12 @@ import okio.use
  *     .build()
  * ```
  *
- * The factory claims only inputs KiteImage fully decodes (GIF, and the PNG/BMP
- * feature subsets) and declines everything else — including interlaced/CgBI
- * PNGs and RLE/bitfields BMPs — so Coil's platform decoders keep handling those
- * and nothing regresses versus a stock setup. Animated results come back as
- * [KiteAnimationImage]; static ones as an ordinary bitmap image that
- * memory-caches normally.
+ * The factory claims only inputs KiteImage fully decodes (GIF, baseline JPEG,
+ * and the PNG/BMP feature subsets) and declines everything else — progressive
+ * JPEG, interlaced/CgBI PNGs, RLE/bitfields BMPs — so Coil's platform decoders
+ * keep handling those and nothing regresses versus a stock setup. Animated
+ * results come back as [KiteAnimationImage]; static ones as an ordinary bitmap
+ * image that memory-caches normally.
  */
 public class KiteImageDecoder(
     private val source: ImageSource,
@@ -56,14 +56,49 @@ public class KiteImageDecoder(
             val peek = result.source.source().peek()
             peek.request(PEEK_BYTES.toLong())
             val header = peek.buffer.readByteArray(minOf(PEEK_BYTES.toLong(), peek.buffer.size))
-            return if (claims(header)) KiteImageDecoder(result.source, options) else null
+            val claimed = when (ImageFormat.sniff(header)) {
+                ImageFormat.GIF -> true
+                ImageFormat.PNG -> pngIsDecodable(header)
+                ImageFormat.BMP -> bmpIsDecodable(header)
+                // JPEG needs a marker walk (SOF position varies behind APPn/EXIF
+                // blobs): claim baseline SOF0/SOF1, decline progressive & exotics.
+                ImageFormat.JPEG -> jpegIsBaseline(result.source.source().peek())
+                else -> false
+            }
+            return if (claimed) KiteImageDecoder(result.source, options) else null
         }
 
-        private fun claims(h: ByteArray): Boolean = when (ImageFormat.sniff(h)) {
-            ImageFormat.GIF -> true
-            ImageFormat.PNG -> pngIsDecodable(h)
-            ImageFormat.BMP -> bmpIsDecodable(h)
-            else -> false
+        /**
+         * Walk the marker stream (bounded) until the first SOF: SOF0/SOF1 →
+         * ours; SOF2 (progressive) and the lossless/arithmetic exotics → Coil's
+         * platform decoder. Runs on a fresh peek, so the real source is unmoved.
+         */
+        internal fun jpegIsBaseline(s: okio.BufferedSource): Boolean = try {
+            var ok = false
+            if ((s.readByte().toInt() and 0xFF) == 0xFF && (s.readByte().toInt() and 0xFF) == 0xD8) {
+                var scanned = 0L
+                loop@ while (scanned < MAX_MARKER_SCAN) {
+                    var m = s.readByte().toInt() and 0xFF
+                    if (m != 0xFF) break@loop
+                    while (m == 0xFF) m = s.readByte().toInt() and 0xFF
+                    when (m) {
+                        0xC0, 0xC1 -> { ok = true; break@loop }                       // baseline / extended sequential
+                        0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF ->
+                            break@loop                                                 // progressive & exotics: not ours
+                        0xD9, 0xDA -> break@loop                                       // EOI/SOS before any SOF: corrupt
+                        0x01, in 0xD0..0xD8 -> Unit                                    // standalone markers, no segment
+                        else -> {                                                      // segment with length (APPn, DQT, DHT, …)
+                            val len = ((s.readByte().toInt() and 0xFF) shl 8) or (s.readByte().toInt() and 0xFF)
+                            if (len < 2) break@loop
+                            s.skip((len - 2).toLong())
+                            scanned += len
+                        }
+                    }
+                }
+            }
+            ok
+        } catch (_: Exception) {
+            false   // truncated peek → let the platform path deal with it
         }
 
         /** Decline what PngDecoder would reject so Coil's platform path keeps it. */
@@ -92,6 +127,8 @@ public class KiteImageDecoder(
         private companion object {
             // Enough for the PNG IHDR interlace byte (29) and the BMP compression field (34).
             const val PEEK_BYTES = 34
+            // JPEG marker-walk bound — EXIF/XMP blobs sit before SOF, but never this much.
+            const val MAX_MARKER_SCAN = 1L shl 20
         }
     }
 }

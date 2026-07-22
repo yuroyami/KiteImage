@@ -80,7 +80,7 @@ class KiteImageDecoderTest {
     }
 
     @Test
-    fun jpegFallsThroughToCoil() {
+    fun baselineJpegDecodesThroughPipeline() {
         val img = BufferedImage(4, 4, BufferedImage.TYPE_INT_RGB)
         for (y in 0 until 4) for (x in 0 until 4) img.setRGB(x, y, 0xFF336699.toInt())
         val out = ByteArrayOutputStream()
@@ -89,5 +89,36 @@ class KiteImageDecoderTest {
         val success = assertIs<SuccessResult>(execute(out.toByteArray()))
         assertTrue(success.image !is KiteAnimationImage)
         assertEquals(4, success.image.width)
+    }
+
+    @Test
+    fun jpegClaimLogicBaselineYesProgressiveNo() {
+        val img = BufferedImage(16, 16, BufferedImage.TYPE_INT_RGB)
+        for (y in 0 until 16) for (x in 0 until 16) img.setRGB(x, y, (x * 16) shl 16 or (y * 16))
+
+        fun encode(progressive: Boolean): ByteArray {
+            val writer = ImageIO.getImageWritersByFormatName("jpeg").next()
+            val param = writer.defaultWriteParam.apply {
+                if (progressive) progressiveMode = javax.imageio.ImageWriteParam.MODE_DEFAULT
+            }
+            val out = ByteArrayOutputStream()
+            javax.imageio.stream.MemoryCacheImageOutputStream(out).use { s ->
+                writer.output = s
+                writer.write(null, javax.imageio.IIOImage(img, null, null), param)
+            }
+            writer.dispose()
+            return out.toByteArray()
+        }
+
+        fun claim(bytes: ByteArray): Boolean {
+            val buf = okio.Buffer().write(bytes)
+            return KiteImageDecoder.Factory().run { jpegIsBaseline(buf.peek()) }
+        }
+
+        assertTrue(claim(encode(progressive = false)), "baseline must be claimed")
+        assertTrue(!claim(encode(progressive = true)), "progressive must be declined")
+        // and the declined progressive file still succeeds via Coil's own decoder
+        val success = assertIs<SuccessResult>(execute(encode(progressive = true)))
+        assertEquals(16, success.image.width)
     }
 }

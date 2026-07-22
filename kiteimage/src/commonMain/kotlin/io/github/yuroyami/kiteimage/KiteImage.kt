@@ -2,6 +2,7 @@ package io.github.yuroyami.kiteimage
 
 import io.github.yuroyami.kiteimage.codec.BmpDecoder
 import io.github.yuroyami.kiteimage.codec.GifDecoder
+import io.github.yuroyami.kiteimage.codec.JpegDecoder
 import io.github.yuroyami.kiteimage.codec.PngDecoder
 
 /**
@@ -32,9 +33,7 @@ public object KiteImage {
         ImageFormat.PNG -> PngDecoder.decode(data)
         ImageFormat.BMP -> BmpDecoder.decode(data)
         ImageFormat.GIF -> GifDecoder.decode(data, firstFrameOnly = true).frames.first().bitmap
-        ImageFormat.JPEG -> throw UnsupportedImageException(
-            "JPEG decoding is not in this version yet — it is on the roadmap",
-        )
+        ImageFormat.JPEG -> JpegDecoder.decode(data)
         ImageFormat.WEBP -> throw UnsupportedImageException(
             "WebP decoding is not in this version yet",
         )

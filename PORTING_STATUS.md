@@ -1,8 +1,8 @@
 # KiteImage — porting status
 
-Updated 2026-07-22 (GIF + the Compose module landed same day). Tests: core 50 on
-JVM (incl. two ImageIO round-trip suites) + 41 on JS/Node (the common set), compose
-2 on JVM (headless Skiko rasterization) — all green. Core targets: Android,
+Updated 2026-07-22 (GIF, Compose, Coil interop and baseline JPEG all landed same
+day). Tests: core 65 on JVM + 51 on JS/Node, compose 2, coil 6 — 124 green total.
+JPEG common vectors assert BIT-IDENTICAL output vs clang-compiled stb_image. Core targets: Android,
 iosArm64, iosSimulatorArm64, iosX64, macosArm64, JVM, JS (browser+node), wasmJs.
 Compose targets: the CMP 1.11 set (no Intel-Apple variants).
 
@@ -26,8 +26,13 @@ Compose targets: the CMP 1.11 set (no Intel-Apple variants).
 | | animation compositing: frame rects, transparency, disposal none/keep/bg/prev | ✅ | |
 | | delays (browser ≤1 cs → 100 ms rule) + NETSCAPE/ANIMEXTS loop count | ✅ | |
 | | `KiteAnimation`/`KiteFrame` API; static formats wrap as 1 frame | ✅ | |
-| **JPEG** | baseline (SOF0) | ❌ planned | stb_image |
-| | progressive (SOF2) | ❌ planned after baseline | |
+| **JPEG** | baseline SOF0 + extended sequential SOF1, 8-bit | ✅ bit-identical to stb (scalar kernels) | stb_image |
+| | Huffman fast tables, fast-AC, restart intervals (real-world DRI file tested), multi-scan non-interleaved | ✅ | |
+| | subsampling h/v 1..4 (4:2:0/4:2:2/4:4:4/4:1:1), triangle-filter upsampling | ✅ | |
+| | gray / YCbCr / component-id RGB / CMYK / YCCK (Adobe APP14) | ✅ | |
+| | progressive (SOF2) | ❌ NEXT — clean `UnsupportedImageException`, coil factory declines to platform | |
+| | lossless/arithmetic/hierarchical | rejected by name (like stb) | |
+| | EXIF orientation | not applied (metadata layer's job) | |
 | **WebP** | VP8/VP8L | ❌ phase 2, sniffed today | libwebp |
 | **TIFF** | baseline subset | ❌ phase 2, sniffed today | commons-imaging |
 | **AVIF / HEIC** | — | permanently out of scope (see REFERENCES.md) | |
