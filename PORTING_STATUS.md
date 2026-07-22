@@ -2,7 +2,7 @@
 
 Updated 2026-07-22 (GIF, Compose, Coil interop, baseline AND progressive JPEG all
 landed same day; JPX/JBIG2/CCITT absorbed from KitePDF in the codec consolidation). Tests:
-core 71 on JVM + 57 on JS/Node, compose 2, coil 6 — 136 total. KitePDF now
+core 78 on JVM + 57 on JS/Node, compose 2, coil 6 — 143 total. KitePDF now
 depends on kiteimage (its 697 tests exercise these codecs daily).
 JPEG common vectors assert BIT-IDENTICAL output vs clang-compiled stb_image. Core targets: Android,
 iosArm64, iosSimulatorArm64, iosX64, macosArm64, JVM, JS (browser+node), wasmJs.

@@ -6,7 +6,7 @@
 [![Ported from](https://img.shields.io/badge/ports-stb__image%20·%20commons--imaging-orange)](reference/REFERENCES.md)
 [![License](https://img.shields.io/badge/license-Apache--2.0-lightgrey)](#license--credits)
 [![Status](https://img.shields.io/badge/status-PNG%20%2F%20BMP%20%2F%20GIF%20%2F%20JPEG%20decode-brightgreen)](PORTING_STATUS.md)
-[![Tests](https://img.shields.io/badge/tests-130%20passing-brightgreen)](PORTING_STATUS.md)
+[![Tests](https://img.shields.io/badge/tests-143%20passing-brightgreen)](PORTING_STATUS.md)
 
 **A pure-Kotlin image codec toolkit for Kotlin Multiplatform: from-scratch ports of the canonical references (stb_image, commons-imaging). The same `.kt` decodes on Android, iOS, desktop JVM, the browser and WASM — no BitmapFactory, no CoreGraphics, no native binary.**
 
