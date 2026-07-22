@@ -50,6 +50,7 @@ lands there) → JPEG baseline (stb_image_write/jpge) → GIF (commons-imaging w
 | `:kiteimage-compose`: `KiteImage()` composable — auto-detects animated vs static, off-UI-thread decode, delays/loop-count playback, `animate` escape hatch, `onError` | ✅ |
 | `KiteBitmap.toImageBitmap()` — Android `createBitmap` / shared Skiko UNPREMUL raster (custom `skikoMain` source set) | ✅ pixel-tested on JVM (opaque exact, semi-alpha ±1, alpha-0 keeps alpha only) |
 | Compose module targets (CMP 1.11 set: android, jvm, iosArm64+sim, macosArm64, js, wasmJs) | ✅ compiling |
+| `:kiteimage-coil`: `KiteImageDecoder` (claims GIF + supported PNG/BMP subsets, declines rest incl. interlaced PNG/CgBI/RLE-BMP), `KiteAnimationImage` (frame-0 static draw, `shareable=false`), `KiteAsyncImage()` (Coil pipeline + our frame loop) | ✅ — 5 jvm integration tests through a real ImageLoader incl. fall-through to Coil's Skia decoder |
 
 ## Excluded, with reasons
 

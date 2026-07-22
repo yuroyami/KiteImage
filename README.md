@@ -87,6 +87,32 @@ browser ≤10 ms → 100 ms rule), disposal compositing, and the NETSCAPE loop c
 finite loops end holding the last frame. `KiteBitmap.toImageBitmap()` is public for
 custom pipelines, and an overload takes an already-decoded `KiteBitmap`.
 
+## Coil interop
+
+`kiteimage-coil` splits the work the right way: **Coil owns the pipes** (network,
+disk + memory cache, request lifecycle), **KiteImage owns the pixels**. Two pieces:
+
+```kotlin
+// 1. plug our codecs into Coil's pipeline
+ImageLoader.Builder(context)
+    .components { add(KiteImageDecoder.Factory()) }
+    .build()
+
+// 2. remote GIF, fetched + cached by Coil, animated by KiteImage — on every target
+KiteAsyncImage(
+    model = "https://example.com/reaction.gif",
+    contentDescription = null,
+)
+```
+
+Coil itself can't animate outside Android (its non-Android decode is a Skia
+delegate, and coil-gif is an Android-only module). `KiteImageDecoder` claims only
+what KiteImage fully decodes — GIF and the supported PNG/BMP subsets — and declines
+the rest (JPEG, SVG, interlaced PNG, …) so Coil's platform decoders keep them and
+nothing regresses. Animated results skip Coil's memory cache (`shareable = false`,
+same tradeoff as coil-gif) and re-decode from disk cache; plain `AsyncImage` still
+shows their first frame, `KiteAsyncImage` plays them.
+
 ## Install
 
 Not yet published — building from source works today:

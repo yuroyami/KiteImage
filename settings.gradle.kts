@@ -30,3 +30,9 @@ include(":kiteimage")
 // KiteImage() composable (auto-detects animated vs static input) and the
 // KiteBitmap → ImageBitmap conversion. Keeps Compose off core consumers.
 include(":kiteimage-compose")
+
+// :kiteimage-coil — Coil interop: KiteImageDecoder plugs our codecs into Coil's
+// pipeline (network, disk/memory cache, lifecycle stay Coil's), and
+// KiteAsyncImage() renders the result with our frame loop so animation works on
+// every target, not just Android.
+include(":kiteimage-coil")
