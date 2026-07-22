@@ -3,7 +3,6 @@ package io.github.yuroyami.kiteimage
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertTrue
 
 /**
  * JPEG vectors: encoded by ffmpeg (an unrelated encoder), ground truth decoded
@@ -242,14 +241,6 @@ class JpegDecoderTest {
             "87fff988",
         w = 32, h = 24, name = "j_lowq",
     )
-
-    @Test
-    fun progressiveRejectedByName() {
-        // SOI + minimal SOF2 marker is enough to hit the rejection.
-        val sof2 = hex("ffd8ffc2000b08000100010111000000")
-        val e = assertFailsWith<UnsupportedImageException> { KiteImage.decode(sof2) }
-        assertTrue("progressive" in e.message!!)
-    }
 
     @Test
     fun truncationsNeverCrash() {

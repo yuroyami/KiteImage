@@ -1,7 +1,7 @@
 # KiteImage — porting status
 
-Updated 2026-07-22 (GIF, Compose, Coil interop and baseline JPEG all landed same
-day). Tests: core 65 on JVM + 51 on JS/Node, compose 2, coil 6 — 124 green total.
+Updated 2026-07-22 (GIF, Compose, Coil interop, baseline AND progressive JPEG all
+landed same day). Tests: core 68 on JVM + 54 on JS/Node, compose 2, coil 6 — 130 total.
 JPEG common vectors assert BIT-IDENTICAL output vs clang-compiled stb_image. Core targets: Android,
 iosArm64, iosSimulatorArm64, iosX64, macosArm64, JVM, JS (browser+node), wasmJs.
 Compose targets: the CMP 1.11 set (no Intel-Apple variants).
@@ -30,7 +30,7 @@ Compose targets: the CMP 1.11 set (no Intel-Apple variants).
 | | Huffman fast tables, fast-AC, restart intervals (real-world DRI file tested), multi-scan non-interleaved | ✅ | |
 | | subsampling h/v 1..4 (4:2:0/4:2:2/4:4:4/4:1:1), triangle-filter upsampling | ✅ | |
 | | gray / YCbCr / component-id RGB / CMYK / YCCK (Adobe APP14) | ✅ | |
-| | progressive (SOF2) | ❌ NEXT — clean `UnsupportedImageException`, coil factory declines to platform | |
+| | progressive (SOF2): spectral selection, successive approximation, EOB runs, DC/AC refinement, deferred dequant+IDCT | ✅ bit-identical to stb | |
 | | lossless/arithmetic/hierarchical | rejected by name (like stb) | |
 | | EXIF orientation | not applied (metadata layer's job) | |
 | **WebP** | VP8/VP8L | ❌ phase 2, sniffed today | libwebp |

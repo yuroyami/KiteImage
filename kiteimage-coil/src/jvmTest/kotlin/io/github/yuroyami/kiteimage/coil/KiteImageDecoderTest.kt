@@ -92,7 +92,7 @@ class KiteImageDecoderTest {
     }
 
     @Test
-    fun jpegClaimLogicBaselineYesProgressiveNo() {
+    fun jpegClaimLogicBaselineAndProgressiveYes() {
         val img = BufferedImage(16, 16, BufferedImage.TYPE_INT_RGB)
         for (y in 0 until 16) for (x in 0 until 16) img.setRGB(x, y, (x * 16) shl 16 or (y * 16))
 
@@ -112,12 +112,13 @@ class KiteImageDecoderTest {
 
         fun claim(bytes: ByteArray): Boolean {
             val buf = okio.Buffer().write(bytes)
-            return KiteImageDecoder.Factory().run { jpegIsBaseline(buf.peek()) }
+            return KiteImageDecoder.Factory().run { jpegIsClaimable(buf.peek()) }
         }
 
         assertTrue(claim(encode(progressive = false)), "baseline must be claimed")
-        assertTrue(!claim(encode(progressive = true)), "progressive must be declined")
-        // and the declined progressive file still succeeds via Coil's own decoder
+        assertTrue(claim(encode(progressive = true)), "progressive must be claimed too")
+        // and a corrupt not-really-a-JPEG stays declined
+        assertTrue(!claim(byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0x00, 0x00)), "junk after SOI declined")
         val success = assertIs<SuccessResult>(execute(encode(progressive = true)))
         assertEquals(16, success.image.width)
     }

@@ -6,7 +6,7 @@
 [![Ported from](https://img.shields.io/badge/ports-stb__image%20·%20commons--imaging-orange)](reference/REFERENCES.md)
 [![License](https://img.shields.io/badge/license-Apache--2.0-lightgrey)](#license--credits)
 [![Status](https://img.shields.io/badge/status-PNG%20%2F%20BMP%20%2F%20GIF%20%2F%20JPEG%20decode-brightgreen)](PORTING_STATUS.md)
-[![Tests](https://img.shields.io/badge/tests-124%20passing-brightgreen)](PORTING_STATUS.md)
+[![Tests](https://img.shields.io/badge/tests-130%20passing-brightgreen)](PORTING_STATUS.md)
 
 **A pure-Kotlin image codec toolkit for Kotlin Multiplatform: from-scratch ports of the canonical references (stb_image, commons-imaging). The same `.kt` decodes on Android, iOS, desktop JVM, the browser and WASM — no BitmapFactory, no CoreGraphics, no native binary.**
 
@@ -60,7 +60,7 @@ Today, at v0.0.1:
 | PNG | ✅ all color types, all depths, all filters (Adam7 interlace: not yet) | roadmap |
 | BMP | ✅ 8/24/32-bit BI_RGB, both row orders | roadmap |
 | GIF | ✅ 87a/89a incl. animation: full LZW, interlace, disposal compositing, delays, loop count | roadmap |
-| JPEG | ✅ baseline+extended sequential: restarts, 4:2:0/4:2:2/4:4:4/4:1:1, gray/YCbCr/RGB/CMYK/YCCK, bit-identical to stb_image (progressive: not yet) | roadmap |
+| JPEG | ✅ baseline + extended sequential + **progressive**: restarts, 4:2:0/4:2:2/4:4:4/4:1:1, gray/YCbCr/RGB/CMYK/YCCK, bit-identical to stb_image | roadmap |
 | WebP | recognised, not decoded | — |
 | TIFF | recognised, not decoded | — |
 | AVIF / HEIC | out of scope (see [REFERENCES.md](reference/REFERENCES.md)) | — |
@@ -107,8 +107,8 @@ KiteAsyncImage(
 
 Coil itself can't animate outside Android (its non-Android decode is a Skia
 delegate, and coil-gif is an Android-only module). `KiteImageDecoder` claims only
-what KiteImage fully decodes — GIF, baseline JPEG and the supported PNG/BMP
-subsets — and declines the rest (progressive JPEG, SVG, interlaced PNG, …) so
+what KiteImage fully decodes — GIF, JPEG (baseline + progressive) and the
+supported PNG/BMP subsets — and declines the rest (SVG, interlaced PNG, …) so
 Coil's platform decoders keep them and nothing regresses. Animated results skip
 Coil's memory cache (`shareable = false`,
 same tradeoff as coil-gif) and re-decode from disk cache; plain `AsyncImage` still

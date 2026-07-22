@@ -10,7 +10,6 @@ import javax.imageio.stream.MemoryCacheImageOutputStream
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 /**
@@ -117,10 +116,11 @@ class JpegImageIoTest {
     }
 
     @Test
-    fun progressiveFromImageIoRejectedByName() {
-        val jpeg = encodeJpeg(photoish(16, 16), 0.8f, progressive = true)
-        val e = assertFailsWith<UnsupportedImageException> { KiteImage.decode(jpeg) }
-        assertTrue("progressive" in e.message!!)
+    fun progressiveQualitySweepAgreesWithImageIo() {
+        val img = photoish(64, 48)
+        for (q in floatArrayOf(0.3f, 0.75f, 0.95f)) {
+            assertCloseToImageIo(encodeJpeg(img, q, progressive = true), "progressive q=$q")
+        }
     }
 
     @Test

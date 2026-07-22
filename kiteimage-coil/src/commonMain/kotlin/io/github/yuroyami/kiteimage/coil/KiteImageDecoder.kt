@@ -24,8 +24,8 @@ import okio.use
  * ```
  *
  * The factory claims only inputs KiteImage fully decodes (GIF, baseline JPEG,
- * and the PNG/BMP feature subsets) and declines everything else — progressive
- * JPEG, interlaced/CgBI PNGs, RLE/bitfields BMPs — so Coil's platform decoders
+ * and the PNG/BMP feature subsets) and declines everything else —
+ * interlaced/CgBI PNGs, RLE/bitfields BMPs, lossless/arithmetic JPEGs — so Coil's platform decoders
  * keep handling those and nothing regresses versus a stock setup. Animated
  * results come back as [KiteAnimationImage]; static ones as an ordinary bitmap
  * image that memory-caches normally.
@@ -61,19 +61,20 @@ public class KiteImageDecoder(
                 ImageFormat.PNG -> pngIsDecodable(header)
                 ImageFormat.BMP -> bmpIsDecodable(header)
                 // JPEG needs a marker walk (SOF position varies behind APPn/EXIF
-                // blobs): claim baseline SOF0/SOF1, decline progressive & exotics.
-                ImageFormat.JPEG -> jpegIsBaseline(result.source.source().peek())
+                // blobs): claim SOF0/SOF1/SOF2, decline the exotics.
+                ImageFormat.JPEG -> jpegIsClaimable(result.source.source().peek())
                 else -> false
             }
             return if (claimed) KiteImageDecoder(result.source, options) else null
         }
 
         /**
-         * Walk the marker stream (bounded) until the first SOF: SOF0/SOF1 →
-         * ours; SOF2 (progressive) and the lossless/arithmetic exotics → Coil's
-         * platform decoder. Runs on a fresh peek, so the real source is unmoved.
+         * Walk the marker stream (bounded) until the first SOF: SOF0/SOF1/SOF2
+         * (baseline, extended sequential, progressive) → ours; the
+         * lossless/arithmetic exotics → Coil's platform decoder. Runs on a
+         * fresh peek, so the real source is unmoved.
          */
-        internal fun jpegIsBaseline(s: okio.BufferedSource): Boolean = try {
+        internal fun jpegIsClaimable(s: okio.BufferedSource): Boolean = try {
             var ok = false
             if ((s.readByte().toInt() and 0xFF) == 0xFF && (s.readByte().toInt() and 0xFF) == 0xD8) {
                 var scanned = 0L
@@ -82,9 +83,9 @@ public class KiteImageDecoder(
                     if (m != 0xFF) break@loop
                     while (m == 0xFF) m = s.readByte().toInt() and 0xFF
                     when (m) {
-                        0xC0, 0xC1 -> { ok = true; break@loop }                       // baseline / extended sequential
-                        0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF ->
-                            break@loop                                                 // progressive & exotics: not ours
+                        0xC0, 0xC1, 0xC2 -> { ok = true; break@loop }                  // baseline / ext. sequential / progressive
+                        0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF ->
+                            break@loop                                                 // exotics: not ours
                         0xD9, 0xDA -> break@loop                                       // EOI/SOS before any SOF: corrupt
                         0x01, in 0xD0..0xD8 -> Unit                                    // standalone markers, no segment
                         else -> {                                                      // segment with length (APPn, DQT, DHT, …)

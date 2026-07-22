@@ -21,9 +21,11 @@ import io.github.yuroyami.kiteimage.UnsupportedImageException
  *  - stb's fixed-point AAN-style IDCT and reduced-precision YCbCr→RGB, so
  *    output is bit-identical to stb_image on the same file
  *
- * Progressive (SOF2) is recognised and rejected with a clear message — next on
- * the roadmap. Arithmetic coding, hierarchical and lossless JPEG are rejected
- * like stb rejects them (nobody writes them). EXIF orientation is metadata and
+ *  - progressive (SOF2): spectral selection + successive approximation, EOB
+ *    runs, DC/AC refinement scans, deferred dequantize+IDCT at EOI
+ *
+ * Arithmetic coding, hierarchical and lossless JPEG are rejected like stb
+ * rejects them (nobody writes them). EXIF orientation is metadata and
  * deliberately not applied.
  */
 internal object JpegDecoder {
@@ -137,6 +139,9 @@ internal object JpegDecoder {
         var w2 = 0; var h2 = 0
         lateinit var data: ByteArray
         lateinit var linebuf: ByteArray
+        // progressive only: raw coefficients, IDCT'd at EOI
+        var coeff: ShortArray? = null
+        var coeffW = 0
     }
 
     private class State(val input: ByteArray) {
@@ -165,6 +170,13 @@ internal object JpegDecoder {
         val order = IntArray(4)
         var restartInterval = 0
         var todo = 0
+
+        var progressive = false
+        var specStart = 0
+        var specEnd = 0
+        var succHigh = 0
+        var succLow = 0
+        var eobRun = 0
 
         // header reads — truncation is a decode error
         fun u8(): Int {
@@ -254,6 +266,27 @@ internal object JpegDecoder {
         return k + (JBIAS[n] and (sgn - 1))
     }
 
+    // stbi__jpeg_get_bits
+    private fun getBits(j: State, n: Int): Int {
+        if (j.codeBits < n) growBuffer(j)
+        if (j.codeBits < n) return 0
+        var k = lrot(j.codeBuffer, n)
+        j.codeBuffer = k and BMASK[n].inv()
+        k = k and BMASK[n]
+        j.codeBits -= n
+        return k
+    }
+
+    // stbi__jpeg_get_bit
+    private fun getBit(j: State): Boolean {
+        if (j.codeBits < 1) growBuffer(j)
+        if (j.codeBits < 1) return false
+        val k = j.codeBuffer
+        j.codeBuffer = j.codeBuffer shl 1
+        j.codeBits--
+        return (k and Int.MIN_VALUE) != 0
+    }
+
     // -------------------------------------------------------------------------
     // block decode + IDCT
 
@@ -301,6 +334,133 @@ internal object JpegDecoder {
                 }
             }
         } while (k < 64)
+    }
+
+    // stbi__jpeg_decode_block_prog_dc
+    private fun decodeBlockProgDc(j: State, data: ShortArray, dataOfs: Int, hdc: Huffman, b: Int) {
+        if (j.specEnd != 0) err("can't merge dc and ac")
+        if (j.codeBits < 16) growBuffer(j)
+
+        if (j.succHigh == 0) {
+            // first DC scan
+            data.fill(0, dataOfs, dataOfs + 64)
+            val t = huffDecode(j, hdc)
+            if (t < 0 || t > 15) err("can't merge dc and ac")
+            val diff = if (t != 0) extendReceive(j, t) else 0
+            val dc = j.comp[b].dcPred + diff
+            j.comp[b].dcPred = dc
+            val v = dc * (1 shl j.succLow)
+            if (v < Short.MIN_VALUE.toInt() || v > Short.MAX_VALUE.toInt()) err("can't merge dc and ac")
+            data[dataOfs] = v.toShort()
+        } else {
+            // DC refinement: one bit
+            if (getBit(j)) {
+                data[dataOfs] = (data[dataOfs] + (1 shl j.succLow)).toShort()
+            }
+        }
+    }
+
+    // stbi__jpeg_decode_block_prog_ac
+    private fun decodeBlockProgAc(j: State, data: ShortArray, dataOfs: Int, hac: Huffman, fac: ShortArray) {
+        if (j.specStart == 0) err("can't merge dc and ac")
+
+        if (j.succHigh == 0) {
+            // first AC scan for this spectral band
+            val shift = j.succLow
+            if (j.eobRun != 0) {
+                j.eobRun--
+                return
+            }
+            var k = j.specStart
+            do {
+                if (j.codeBits < 16) growBuffer(j)
+                val c = (j.codeBuffer ushr (32 - FAST_BITS)) and ((1 shl FAST_BITS) - 1)
+                val r = fac[c].toInt()
+                if (r != 0) {   // fast-AC path
+                    k += (r shr 4) and 15
+                    val s = r and 15
+                    if (s > j.codeBits) err("bad huffman code")
+                    j.codeBuffer = j.codeBuffer shl s
+                    j.codeBits -= s
+                    val zig = DEZIGZAG[k++]
+                    data[dataOfs + zig] = ((r shr 8) * (1 shl shift)).toShort()
+                } else {
+                    val rs = huffDecode(j, hac)
+                    if (rs < 0) err("bad huffman code")
+                    val s = rs and 15
+                    val run = rs shr 4
+                    if (s == 0) {
+                        if (run < 15) {
+                            j.eobRun = 1 shl run
+                            if (run != 0) j.eobRun += getBits(j, run)
+                            j.eobRun--
+                            break
+                        }
+                        k += 16
+                    } else {
+                        k += run
+                        val zig = DEZIGZAG[k++]
+                        data[dataOfs + zig] = (extendReceive(j, s) * (1 shl shift)).toShort()
+                    }
+                }
+            } while (k <= j.specEnd)
+        } else {
+            // AC refinement
+            val bit = (1 shl j.succLow).toShort()
+
+            if (j.eobRun != 0) {
+                j.eobRun--
+                for (k in j.specStart..j.specEnd) {
+                    val p = dataOfs + DEZIGZAG[k]
+                    if (data[p].toInt() != 0 && getBit(j) && (data[p].toInt() and bit.toInt()) == 0) {
+                        data[p] = if (data[p] > 0) {
+                            (data[p] + bit).toShort()
+                        } else {
+                            (data[p] - bit).toShort()
+                        }
+                    }
+                }
+            } else {
+                var k = j.specStart
+                do {
+                    val rs = huffDecode(j, hac)
+                    if (rs < 0) err("bad huffman code")
+                    var s = rs and 15
+                    var r = rs shr 4
+                    if (s == 0) {
+                        if (r < 15) {
+                            j.eobRun = (1 shl r) - 1
+                            if (r != 0) j.eobRun += getBits(j, r)
+                            r = 64   // force end of block
+                        }
+                        // r == 15, s == 0: run of 15 zeros then write s (0) — nothing special
+                    } else {
+                        if (s != 1) err("bad huffman code")
+                        s = if (getBit(j)) bit.toInt() else -bit.toInt()
+                    }
+
+                    // advance by r, refining existing nonzero coefficients on the way
+                    while (k <= j.specEnd) {
+                        val p = dataOfs + DEZIGZAG[k++]
+                        if (data[p].toInt() != 0) {
+                            if (getBit(j) && (data[p].toInt() and bit.toInt()) == 0) {
+                                data[p] = if (data[p] > 0) {
+                                    (data[p] + bit).toShort()
+                                } else {
+                                    (data[p] - bit).toShort()
+                                }
+                            }
+                        } else {
+                            if (r == 0) {
+                                data[p] = s.toShort()
+                                break
+                            }
+                            r--
+                        }
+                    }
+                } while (k <= j.specEnd)
+            }
+        }
     }
 
     private fun f2f(x: Double): Int = (x * 4096 + 0.5).toInt()
@@ -424,6 +584,7 @@ internal object JpegDecoder {
         for (c in j.comp) c.dcPred = 0
         j.marker = MARKER_NONE
         j.todo = if (j.restartInterval != 0) j.restartInterval else Int.MAX_VALUE
+        j.eobRun = 0
     }
 
     private fun isRestart(m: Int) = m in 0xD0..0xD7
@@ -565,6 +726,11 @@ internal object JpegDecoder {
             comp.w2 = j.mcuX * comp.h * 8
             comp.h2 = j.mcuY * comp.v * 8
             comp.data = ByteArray(comp.w2 * comp.h2)
+            if (j.progressive) {
+                // w2/h2 are multiples of 8; one 64-short block per 8x8 tile
+                comp.coeffW = comp.w2 / 8
+                comp.coeff = ShortArray(comp.w2 * comp.h2)
+            }
         }
     }
 
@@ -589,15 +755,29 @@ internal object JpegDecoder {
             if (j.comp[which].ha > 3) err("bad AC huff")
             j.order[i] = which
         }
-        val specStart = j.u8()
-        j.u8()   // spec_end (should be 63; baseline ignores)
+        j.specStart = j.u8()
+        j.specEnd = j.u8()
         val aa = j.u8()
-        if (specStart != 0 || (aa shr 4) != 0 || (aa and 15) != 0) err("bad SOS")
+        j.succHigh = aa shr 4
+        j.succLow = aa and 15
+        if (j.progressive) {
+            if (j.specStart > 63 || j.specEnd > 63 || j.specStart > j.specEnd ||
+                j.succHigh > 13 || j.succLow > 13
+            ) err("bad SOS")
+        } else {
+            if (j.specStart != 0) err("bad SOS")
+            if (j.succHigh != 0 || j.succLow != 0) err("bad SOS")
+            j.specEnd = 63
+        }
     }
 
-    // stbi__parse_entropy_coded_data, baseline paths
+    // stbi__parse_entropy_coded_data
     private fun parseEntropyCodedData(j: State) {
         reset(j)
+        if (j.progressive) {
+            parseProgressiveScan(j)
+            return
+        }
         val data = ShortArray(64)
         val tmp = IntArray(64)
         if (j.scanN == 1) {
@@ -638,6 +818,78 @@ internal object JpegDecoder {
                         if (!isRestart(j.marker)) return
                         reset(j)
                     }
+                }
+            }
+        }
+    }
+
+    // stbi__parse_entropy_coded_data, progressive paths — coefficients only,
+    // no IDCT here; that happens once at EOI in [finishProgressive].
+    private fun parseProgressiveScan(j: State) {
+        if (j.scanN == 1) {
+            val n = j.order[0]
+            val comp = j.comp[n]
+            val coeff = comp.coeff!!
+            val w = (comp.x + 7) shr 3
+            val h = (comp.y + 7) shr 3
+            for (jj in 0 until h) {
+                for (i in 0 until w) {
+                    val ofs = 64 * (i + jj * comp.coeffW)
+                    if (j.specStart == 0) {
+                        decodeBlockProgDc(j, coeff, ofs, j.huffDc[comp.hd], n)
+                    } else {
+                        decodeBlockProgAc(j, coeff, ofs, j.huffAc[comp.ha], j.fastAc[comp.ha])
+                    }
+                    if (--j.todo <= 0) {
+                        if (j.codeBits < 24) growBuffer(j)
+                        if (!isRestart(j.marker)) return
+                        reset(j)
+                    }
+                }
+            }
+        } else {
+            // interleaved progressive scans carry DC only
+            for (jj in 0 until j.mcuY) {
+                for (i in 0 until j.mcuX) {
+                    for (k in 0 until j.scanN) {
+                        val n = j.order[k]
+                        val comp = j.comp[n]
+                        val coeff = comp.coeff!!
+                        for (y in 0 until comp.v) {
+                            for (x in 0 until comp.h) {
+                                val x2 = i * comp.h + x        // block coords, not pixels
+                                val y2 = jj * comp.v + y
+                                decodeBlockProgDc(j, coeff, 64 * (x2 + y2 * comp.coeffW), j.huffDc[comp.hd], n)
+                            }
+                        }
+                    }
+                    if (--j.todo <= 0) {
+                        if (j.codeBits < 24) growBuffer(j)
+                        if (!isRestart(j.marker)) return
+                        reset(j)
+                    }
+                }
+            }
+        }
+    }
+
+    // stbi__jpeg_finish: dequantize + IDCT every block of every component
+    private fun finishProgressive(j: State) {
+        val block = ShortArray(64)
+        val tmp = IntArray(64)
+        for (n in 0 until j.imgN) {
+            val comp = j.comp[n]
+            val coeff = comp.coeff ?: continue
+            val dq = j.dequant[comp.tq]
+            val w = (comp.x + 7) shr 3
+            val h = (comp.y + 7) shr 3
+            for (jj in 0 until h) {
+                for (i in 0 until w) {
+                    val ofs = 64 * (i + jj * comp.coeffW)
+                    for (k in 0 until 64) {   // stbi__jpeg_dequantize
+                        block[k] = (coeff[ofs + k] * dq[k]).toShort()
+                    }
+                    idctBlock(comp.data, comp.w2 * jj * 8 + i * 8, comp.w2, block, tmp)
                 }
             }
         }
@@ -791,9 +1043,10 @@ internal object JpegDecoder {
         while (true) {
             when (m) {
                 0xC0, 0xC1 -> break                          // SOF0 baseline / SOF1 extended sequential
-                0xC2 -> throw UnsupportedImageException(
-                    "progressive JPEG (SOF2) is not supported yet — baseline only for now",
-                )
+                0xC2 -> {                                    // SOF2 progressive
+                    j.progressive = true
+                    break
+                }
                 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF ->
                     throw UnsupportedImageException(
                         "JPEG with SOF marker 0x${m.toString(16)} (lossless/arithmetic/hierarchical) is not supported",
@@ -835,6 +1088,7 @@ internal object JpegDecoder {
             }
         }
         if (!sawScan) err("no SOS scan before EOI")
+        if (j.progressive) finishProgressive(j)
 
         // resample + color convert (tail of stbi__load_jpeg_image, n == 4 w/ opaque alpha)
         val decodeN = if (j.imgN < 3) 1 else j.imgN
