@@ -1,8 +1,8 @@
 # KiteImage — porting status
 
-Updated 2026-07-22. Tests: 34 on JVM (incl. ImageIO round-trip suite), 28 on JS/Node
-(the common set), all green. Targets compiling: Android, iosArm64, iosSimulatorArm64,
-iosX64, JVM, JS (browser+node), wasmJs.
+Updated 2026-07-22 (GIF landed same day). Tests: 50 on JVM (incl. two ImageIO
+round-trip suites), 41 on JS/Node (the common set), all green. Targets compiling:
+Android, iosArm64, iosSimulatorArm64, iosX64, JVM, JS (browser+node), wasmJs.
 
 ## Decoders
 
@@ -19,7 +19,11 @@ iosX64, JVM, JS (browser+node), wasmJs.
 | | bottom-up + top-down, 4-byte row padding | ✅ | |
 | | all-zero-alpha 32-bit → opaque (stb rule) | ✅ | |
 | | BI_RLE4/RLE8/BITFIELDS, 1/2/4/16-bit, OS/2 core header | ❌ rejected by name | |
-| **GIF** | LZW, interlace, disposal, delays, loop count | ❌ NEXT UP | stb_image, giflib |
+| **GIF** | 87a/89a, LZW (growth, KwKwK, deferred clear, mid-stream CLEAR) | ✅ | stb_image, giflib |
+| | global + local color tables, 4-pass interlace | ✅ | |
+| | animation compositing: frame rects, transparency, disposal none/keep/bg/prev | ✅ | |
+| | delays (browser ≤1 cs → 100 ms rule) + NETSCAPE/ANIMEXTS loop count | ✅ | |
+| | `KiteAnimation`/`KiteFrame` API; static formats wrap as 1 frame | ✅ | |
 | **JPEG** | baseline (SOF0) | ❌ planned | stb_image |
 | | progressive (SOF2) | ❌ planned after baseline | |
 | **WebP** | VP8/VP8L | ❌ phase 2, sniffed today | libwebp |
