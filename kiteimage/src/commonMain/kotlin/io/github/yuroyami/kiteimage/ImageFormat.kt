@@ -13,6 +13,7 @@ public enum class ImageFormat {
     BMP,
     WEBP,
     TIFF,
+    JP2,
     ;
 
     public companion object {
@@ -44,6 +45,12 @@ public enum class ImageFormat {
                 // "II*\0" (little-endian) or "MM\0*" (big-endian)
                 at(0) == 'I'.code && at(1) == 'I'.code && at(2) == 0x2A && at(3) == 0x00 -> TIFF
                 at(0) == 'M'.code && at(1) == 'M'.code && at(2) == 0x00 && at(3) == 0x2A -> TIFF
+
+                // JPEG 2000: JP2 signature box (length 12, type "jP  ") or a raw
+                // J2K codestream's SOC marker FF 4F.
+                at(0) == 0x00 && at(1) == 0x00 && at(2) == 0x00 && at(3) == 0x0C &&
+                    at(4) == 'j'.code && at(5) == 'P'.code && at(6) == ' '.code && at(7) == ' '.code -> JP2
+                at(0) == 0xFF && at(1) == 0x4F -> JP2
 
                 // "BM" — last: two ASCII letters is the weakest magic of the set.
                 at(0) == 'B'.code && at(1) == 'M'.code -> BMP

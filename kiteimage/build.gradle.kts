@@ -43,6 +43,19 @@ kotlin {
     // and :kiteimage-compose needs the core published for every CMP target.
     macosArm64()
 
+    // The rest of the KMP matrix. The core is pure stdlib computation, and
+    // :kitepdf-core (which targets everything) depends on it — so it ships
+    // everywhere kitepdf-core does. Compose/Coil modules stay on the CMP set.
+    tvosArm64(); tvosSimulatorArm64()
+    watchosArm32(); watchosArm64(); watchosDeviceArm64(); watchosSimulatorArm64()
+    androidNativeArm32(); androidNativeArm64(); androidNativeX64(); androidNativeX86()
+    linuxX64(); linuxArm64()
+    mingwX64()
+    @OptIn(ExperimentalWasmDsl::class)
+    wasmWasi {
+        nodejs()
+    }
+
     @OptIn(ExperimentalKotlinGradlePluginApi::class)
     js(IR) {
         browser()

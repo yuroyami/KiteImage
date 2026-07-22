@@ -61,6 +61,8 @@ Today, at v0.0.1:
 | BMP | ✅ 8/24/32-bit BI_RGB, both row orders | roadmap |
 | GIF | ✅ 87a/89a incl. animation: full LZW, interlace, disposal compositing, delays, loop count | roadmap |
 | JPEG | ✅ baseline + extended sequential + **progressive**: restarts, 4:2:0/4:2:2/4:4:4/4:1:1, gray/YCbCr/RGB/CMYK/YCCK, bit-identical to stb_image | roadmap |
+| JPEG 2000 | ✅ JP2/J2K part 1 (moved from KitePDF, OpenJPEG-oracle-tested) | — |
+| JBIG2 / CCITT G3+G4 | ✅ parameterized codec APIs (scan-world; no container magic) | — |
 | WebP | recognised, not decoded | — |
 | TIFF | recognised, not decoded | — |
 | AVIF / HEIC | out of scope (see [REFERENCES.md](reference/REFERENCES.md)) | — |

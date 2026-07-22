@@ -1,7 +1,9 @@
 # KiteImage — porting status
 
 Updated 2026-07-22 (GIF, Compose, Coil interop, baseline AND progressive JPEG all
-landed same day). Tests: core 68 on JVM + 54 on JS/Node, compose 2, coil 6 — 130 total.
+landed same day; JPX/JBIG2/CCITT absorbed from KitePDF in the codec consolidation). Tests:
+core 71 on JVM + 57 on JS/Node, compose 2, coil 6 — 136 total. KitePDF now
+depends on kiteimage (its 697 tests exercise these codecs daily).
 JPEG common vectors assert BIT-IDENTICAL output vs clang-compiled stb_image. Core targets: Android,
 iosArm64, iosSimulatorArm64, iosX64, macosArm64, JVM, JS (browser+node), wasmJs.
 Compose targets: the CMP 1.11 set (no Intel-Apple variants).
@@ -33,6 +35,9 @@ Compose targets: the CMP 1.11 set (no Intel-Apple variants).
 | | progressive (SOF2): spectral selection, successive approximation, EOB runs, DC/AC refinement, deferred dequant+IDCT | ✅ bit-identical to stb | |
 | | lossless/arithmetic/hierarchical | rejected by name (like stb) | |
 | | EXIF orientation | not applied (metadata layer's job) | |
+| **JPEG 2000** | JP2 container + raw J2K codestream, part 1 (EBCOT, 5/3+9/7 DWT, all progressions, tiles) | ✅ moved from KitePDF; facade decode + `JpxDecoder` raw API | KitePDF (T-44 oracle vs OpenJPEG) |
+| **JBIG2** | generic-region arithmetic + MMR paths, embedded streams w/ globals | ✅ moved from KitePDF; parameterized `Jbig2Decoder` API (no container to sniff) | KitePDF |
+| **CCITT G3/G4** | T.4 1D + T.6 2D fax; TIFF compressions 3/4 groundwork | ✅ moved from KitePDF; parameterized `CcittFax` API | KitePDF |
 | **WebP** | VP8/VP8L | ❌ phase 2, sniffed today | libwebp |
 | **TIFF** | baseline subset | ❌ phase 2, sniffed today | commons-imaging |
 | **AVIF / HEIC** | — | permanently out of scope (see REFERENCES.md) | |

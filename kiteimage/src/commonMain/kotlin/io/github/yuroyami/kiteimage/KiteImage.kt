@@ -34,6 +34,7 @@ public object KiteImage {
         ImageFormat.BMP -> BmpDecoder.decode(data)
         ImageFormat.GIF -> GifDecoder.decode(data, firstFrameOnly = true).frames.first().bitmap
         ImageFormat.JPEG -> JpegDecoder.decode(data)
+        ImageFormat.JP2 -> jp2ToBitmap(data)
         ImageFormat.WEBP -> throw UnsupportedImageException(
             "WebP decoding is not in this version yet",
         )
@@ -49,6 +50,27 @@ public object KiteImage {
                 } else ""
             })",
         )
+    }
+
+    /** JPEG 2000 → ARGB via the JPX codec (gray replicated, cdef alpha honored). */
+    private fun jp2ToBitmap(data: ByteArray): KiteBitmap {
+        val r = io.github.yuroyami.kiteimage.codec.JpxDecoder.decode(data)
+            ?: throw ImageDecodeException("JPEG 2000: stream is malformed or uses an unsupported feature")
+        val n = if (r.colorSpace == "DeviceRGB") 3 else 1
+        val argb = IntArray(r.width * r.height)
+        for (i in argb.indices) {
+            val a = r.alpha?.let { it[i].toInt() and 0xFF } ?: 0xFF
+            if (n == 3) {
+                argb[i] = (a shl 24) or
+                    ((r.pixelBytes[i * 3].toInt() and 0xFF) shl 16) or
+                    ((r.pixelBytes[i * 3 + 1].toInt() and 0xFF) shl 8) or
+                    (r.pixelBytes[i * 3 + 2].toInt() and 0xFF)
+            } else {
+                val g = r.pixelBytes[i].toInt() and 0xFF
+                argb[i] = (a shl 24) or (g shl 16) or (g shl 8) or g
+            }
+        }
+        return KiteBitmap(r.width, r.height, argb)
     }
 
     /**
